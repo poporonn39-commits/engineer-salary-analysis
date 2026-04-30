@@ -7,10 +7,10 @@ APP_KEY = "12776a9c4c36d3b8d12e82eb89df5a23"
 
 keywords = [
     "data analyst",
-    "junior analyst",
-    "senior data analyst",
-    "business analyst",
-    "bi analyst"
+    "software engineer",
+    "frontend engineer",
+    "backend engineer",
+    "full stack engineer"
 ]
 
 #複数ページ取得
@@ -19,35 +19,40 @@ all_jobs = []
 for keyword in keywords:
     print(f"\n検索中: {keyword}")
 
-    for page in range(1, 3):
+    for page in range(1, 4):
 
-        url = "https://api.adzuna.com/v1/api/jobs/us/search/1"
+        url = "https://api.adzuna.com/v1/api/jobs/us/search/" + str(page)
 
         params = {
             "app_id": APP_ID,
             "app_key": APP_KEY,
-            "what": "data analyst",
+            "what": keyword,
             "results_per_page": 50
         }
 
         response = requests.get(url, params=params)
         data = response.json()
 
-        jobs = data["results"]
+        jobs = data.get("results", [])
 
-        print(f"{page}ページ目取得件数:", len(jobs))
+        print(f"{keyword} page{page}: {len(jobs)}件")
+
+        #どの検索語で取れた求人か保存
+        for job in jobs:
+            job["searched_keyword"] = keyword
 
         all_jobs.extend(jobs)
 
 print("\n取得総件数:", len(all_jobs))
 
 #前処理
-skills = ["python", "sql", "aws", "java", "javascript", "excel", "tableau", "power bi", "sas", "r", "spark"]
+skills = ["python", "sql", "aws", "java", "javascript", "typescript", "excel", "tableau", "power bi", "docker", "react", "git"]
 
 processed = []
 
 for job in all_jobs:
     item = {
+        "keyword": job.get("searched_keyword", ""),
         "title": job.get("title", ""),
         "company": job.get("company", {}).get("display_name", ""),
         "description": job.get("description", ""),
@@ -73,12 +78,14 @@ for job in all_jobs:
     item["java"] = re.search(r"\bjava\b",text) is not None
     item["javascript"] = re.search(r"\bjavascript\b", text) is not None
 
+    item["typescript"] = "typescript" in text
     item["excel"] = "excel" in text
     item["tableau"] = "tableau" in text
-    item["power_bi"] = re.search(r"\bpower bi\b", text) is not None
-    item["sas"] = re.search(r"\bsas\b", text) is not None
-    item["r"] = re.search(r"\br\b", text) is not None
-    item["spark"] = re.search(r"\bspark\b", text) is not None
+    item["power_bi"] = "power bi" in text or "powerbi" in text
+    item["docker"] = "docker" in text
+    item["react"] = "react" in text
+    item["git"] = "git" in text
+    
 
     processed.append(item)
 
@@ -98,14 +105,18 @@ print("重複削除後:", len(df))
 
 #スキル件数TOP5
 
-skill_cols = ["python", "sql", "aws", "java", "javascript", "excel", "tableau", "power_bi", "sas", "r", "spark"]
+skill_cols = ["python", "sql", "aws", "java", "javascript", "typescript", "excel", "tableau", "power_bi", "docker", "react", "git"]
 
 skill_counts = df[skill_cols].sum()
 
 print("スキル件数TOP5")
-print(skill_counts.sort_values(ascending=False).head(5))
+print(skill_counts.sort_values(ascending=False).head(7))
 
 #給与概要
 df = df[df["salary"] >= 50000]
 print("\n給与統計")
 print(df["salary"].describe())
+
+#職種別平均給与
+print("\n職種別平均給与")
+print(df.groupby("keyword")["salary"].mean().sort_values(ascending=False))
