@@ -10,7 +10,11 @@ keywords = [
     "software engineer",
     "frontend engineer",
     "backend engineer",
-    "full stack engineer"
+    "full stack engineer",
+    "junior developer",
+    "entry level analyst",
+    "junior data analyst",
+    "graduate engineer"
 ]
 
 #複数ページ取得
@@ -46,7 +50,7 @@ for keyword in keywords:
 print("\n取得総件数:", len(all_jobs))
 
 #前処理
-skills = ["python", "sql", "aws", "java", "javascript", "typescript", "excel", "tableau", "power bi", "docker", "react", "git"]
+skills = ["python", "sql", "aws", "java", "javascript", "typescript", "excel", "tableau", "power_bi", "docker", "react", "git"]
 
 processed = []
 
@@ -85,7 +89,61 @@ for job in all_jobs:
     item["docker"] = "docker" in text
     item["react"] = "react" in text
     item["git"] = "git" in text
+
+    # 仮説2: 未経験OK判定
+    search_kw = item["keyword"].lower()
+
+    strong_keywords = [
+        "no experience",
+        "entry level",
+        "trainee",
+        "fresh graduate"
+    ]
+
+    medium_keywords = [
+        "junior",
+        "graduate",
+        "training provided",
+        "assistant",
+        "intern"
+    ]
+
+    negative_keywords = [
+        "3+ years",
+        "5+ years",
+        "7+ years",
+        "senior",
+        "lead",
+        "manager",
+        "principal"
+    ]
+
+    score = 0
+
+    for word in ["junior", "entry level", "graduate"]:
+        if word in search_kw:
+            score += 3
+
+    for word in strong_keywords:
+        if word in text:
+            score += 2
+
+    for word in medium_keywords:
+        if word in text:
+            score += 1
+
+    for word in negative_keywords:
+        if word in text:
+            score -= 2
+
+    item["no_experience"] = score >= 2
     
+    #仮説3: リモート可判定
+    item["remote"] = (
+        "remote" in text or
+        "work from home" in text or
+        "hybrid" in text
+    )
 
     processed.append(item)
 
@@ -103,20 +161,42 @@ print("重複削除前:", len(df))
 df = df.drop_duplicates(subset=["title", "company", "location"])
 print("重複削除後:", len(df))
 
-#スキル件数TOP5
+#スキル件数TOP7
+skill_counts = df[skills].sum()
+skill_counts = skill_counts[skill_counts > 0]
 
-skill_cols = ["python", "sql", "aws", "java", "javascript", "typescript", "excel", "tableau", "power_bi", "docker", "react", "git"]
-
-skill_counts = df[skill_cols].sum()
-
-print("スキル件数TOP5")
+print("スキル件数TOP7")
 print(skill_counts.sort_values(ascending=False).head(7))
 
-#給与概要
+#給与あり&ノイズ除去
+df = df[df["salary"].notna()]
 df = df[df["salary"] >= 50000]
+
+#給与概要
 print("\n給与統計")
 print(df["salary"].describe())
 
 #職種別平均給与
 print("\n職種別平均給与")
 print(df.groupby("keyword")["salary"].mean().sort_values(ascending=False))
+
+#仮説1: スキル有無で年収差
+print("\n--- 仮説1: スキル有無で年収差 ---")
+
+for skill in skills:
+    result = df.groupby(skill)["salary"].mean()
+    print(f"\n{skill}")
+    print(result)
+
+#仮説2: 未経験OK求人は低年収か
+print("\n--- 仮説2: 未経験OK求人の給与 ---")
+print(df.groupby("no_experience")["salary"].agg(["mean", "count"]))
+
+print("\n職種別 * 未経験OK")
+print(df.groupby(["keyword", "no_experience",])["salary"].agg(["mean", "count"]).sort_values(by="mean", ascending=False))
+
+#仮説3: リモート可求人は高収入か
+print("\n--- 仮説3: リモート求人の給与 ---")
+print(df.groupby("remote")["salary"].mean())
+
+print("\n職種別 * リモート")
