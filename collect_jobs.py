@@ -1,6 +1,8 @@
 import requests
 import pandas as pd
 import re
+import time
+import statsmodels.formula.api as smf
 
 APP_ID = "6567b9ca"
 APP_KEY = "12776a9c4c36d3b8d12e82eb89df5a23"
@@ -35,6 +37,9 @@ for keyword in keywords:
         }
 
         response = requests.get(url, params=params)
+
+        time.sleep(1)
+
         data = response.json()
 
         jobs = data.get("results", [])
@@ -50,7 +55,22 @@ for keyword in keywords:
 print("\n取得総件数:", len(all_jobs))
 
 #前処理
-skills = ["python", "sql", "aws", "java", "javascript", "typescript", "excel", "tableau", "power_bi", "docker", "react", "git"]
+skill_patterns = {
+    "python": r"\bpython\b",
+    "sql": r"\bsql\b",
+    "aws": r"\baws\b",
+    "java": r"\bjava\b",
+    "javascript": r"\bjavascript\b",
+    "typescript": r"\btypescript\b",
+    "excel": r"\bexcel\b",
+    "tableau": r"\btableau\b",
+    "power_bi": r"power bi|powerbi",
+    "docker": r"\bdocker\b",
+    "react": r"\breact\b",
+    "git": r"\bgit\b"
+}
+
+skills = list(skill_patterns.keys())
 
 processed = []
 
@@ -72,23 +92,11 @@ for job in all_jobs:
     else:
         item["salary"] = None
 
-    text = item["description"].lower()
+    text = (item["title"] + " " + item["description"]).lower()
 
     #スキル判定
-    item["python"] = "python" in text
-    item["sql"] = "sql" in text
-    item["aws"] = "aws" in text
-
-    item["java"] = re.search(r"\bjava\b",text) is not None
-    item["javascript"] = re.search(r"\bjavascript\b", text) is not None
-
-    item["typescript"] = "typescript" in text
-    item["excel"] = "excel" in text
-    item["tableau"] = "tableau" in text
-    item["power_bi"] = "power bi" in text or "powerbi" in text
-    item["docker"] = "docker" in text
-    item["react"] = "react" in text
-    item["git"] = "git" in text
+    for skill, pattern in skill_patterns.items():
+        item[skill] = re.search(pattern, text) is not None
 
     # 仮説2: 未経験OK判定
     search_kw = item["keyword"].lower()
@@ -172,6 +180,9 @@ print(skill_counts.sort_values(ascending=False).head(7))
 df = df[df["salary"].notna()]
 df = df[df["salary"] >= 50000]
 
+#推定給与除外
+#df = df[df["salary_is_predicted"] == "0"]
+
 #給与概要
 print("\n給与統計")
 print(df["salary"].describe())
@@ -180,6 +191,7 @@ print(df["salary"].describe())
 print("\n職種別平均給与")
 print(df.groupby("keyword")["salary"].mean().sort_values(ascending=False))
 
+
 #仮説1: スキル有無で年収差
 print("\n--- 仮説1: スキル有無で年収差 ---")
 
@@ -187,6 +199,25 @@ for skill in skills:
     result = df.groupby(skill)["salary"].mean()
     print(f"\n{skill}")
     print(result)
+    
+#仮説1(改善版): 職種ごと * スキル
+print("\n--- 仮説1 (改善版): 職種ごと * スキル ---")
+
+for skill in skills:
+    print(f"\n{skill}")
+
+    result = df.groupby(["keyword", skill])["salary"].mean().unstack()
+
+    if True in result.columns and False in result.columns:
+        result["diff"] = result[True] - result[False]
+        print(result)
+
+#スキル数と年収
+df["skill_count"] = df[skills].sum(axis=1)
+
+
+print("\nスキル数 * 年収")
+print(df.groupby("skill_count")["salary"].mean())
 
 #仮説2: 未経験OK求人は低年収か
 print("\n--- 仮説2: 未経験OK求人の給与 ---")
@@ -195,8 +226,28 @@ print(df.groupby("no_experience")["salary"].agg(["mean", "count"]))
 print("\n職種別 * 未経験OK")
 print(df.groupby(["keyword", "no_experience",])["salary"].agg(["mean", "count"]).sort_values(by="mean", ascending=False))
 
+print(("\n--- 仮説2 (件数、割合確認)"))
+print(df["no_experience"].value_counts())
+print(df["no_experience"].value_counts(normalize=True) * 100)
+
+
 #仮説3: リモート可求人は高収入か
 print("\n--- 仮説3: リモート求人の給与 ---")
 print(df.groupby("remote")["salary"].mean())
 
 print("\n職種別 * リモート")
+print(df.groupby(["keyword", "remote"])["salary"].mean().unstack())
+
+
+#回帰分析用
+reg_df = df.copy()
+
+binary_cols = ["python", "sql", "aws", "remote", "no_experience"]
+
+for col in binary_cols:
+    reg_df[col] = reg_df[col].astype(int)
+
+#重回帰分析
+model = smf.ols("salary ~ python + sql + aws + remote + no_experience + C(keyword)", data=reg_df).fit()
+
+print(model.summary())
