@@ -50,6 +50,7 @@ Adzuna APIから取得したUS求人データを用いて、
 
 ## 6.ディレクトリ構成
 
+```text
 project/
 ├── data/
 │   └── cleaned_jobs.csv
@@ -61,6 +62,7 @@ project/
 ├── collect_jobs.py
 ├── README.md
 └── requirements.txt
+```
 
 ## 7.実行方法
 
