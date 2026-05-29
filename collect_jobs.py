@@ -2,7 +2,10 @@ import requests
 import pandas as pd
 import re
 import time
-import statsmodels.formula.api as smf
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
 
 APP_ID = "6567b9ca"
 APP_KEY = "12776a9c4c36d3b8d12e82eb89df5a23"
@@ -169,85 +172,6 @@ print("重複削除前:", len(df))
 df = df.drop_duplicates(subset=["title", "company", "location"])
 print("重複削除後:", len(df))
 
-#スキル件数TOP7
-skill_counts = df[skills].sum()
-skill_counts = skill_counts[skill_counts > 0]
+df.to_csv("data/cleaned_jobs.csv", index=False)
 
-print("スキル件数TOP7")
-print(skill_counts.sort_values(ascending=False).head(7))
-
-#給与あり&ノイズ除去
-df = df[df["salary"].notna()]
-df = df[df["salary"] >= 50000]
-
-#推定給与除外
-#df = df[df["salary_is_predicted"] == "0"]
-
-#給与概要
-print("\n給与統計")
-print(df["salary"].describe())
-
-#職種別平均給与
-print("\n職種別平均給与")
-print(df.groupby("keyword")["salary"].mean().sort_values(ascending=False))
-
-
-#仮説1: スキル有無で年収差
-print("\n--- 仮説1: スキル有無で年収差 ---")
-
-for skill in skills:
-    result = df.groupby(skill)["salary"].mean()
-    print(f"\n{skill}")
-    print(result)
-    
-#仮説1(改善版): 職種ごと * スキル
-print("\n--- 仮説1 (改善版): 職種ごと * スキル ---")
-
-for skill in skills:
-    print(f"\n{skill}")
-
-    result = df.groupby(["keyword", skill])["salary"].mean().unstack()
-
-    if True in result.columns and False in result.columns:
-        result["diff"] = result[True] - result[False]
-        print(result)
-
-#スキル数と年収
-df["skill_count"] = df[skills].sum(axis=1)
-
-
-print("\nスキル数 * 年収")
-print(df.groupby("skill_count")["salary"].mean())
-
-#仮説2: 未経験OK求人は低年収か
-print("\n--- 仮説2: 未経験OK求人の給与 ---")
-print(df.groupby("no_experience")["salary"].agg(["mean", "count"]))
-
-print("\n職種別 * 未経験OK")
-print(df.groupby(["keyword", "no_experience",])["salary"].agg(["mean", "count"]).sort_values(by="mean", ascending=False))
-
-print(("\n--- 仮説2 (件数、割合確認)"))
-print(df["no_experience"].value_counts())
-print(df["no_experience"].value_counts(normalize=True) * 100)
-
-
-#仮説3: リモート可求人は高収入か
-print("\n--- 仮説3: リモート求人の給与 ---")
-print(df.groupby("remote")["salary"].mean())
-
-print("\n職種別 * リモート")
-print(df.groupby(["keyword", "remote"])["salary"].mean().unstack())
-
-
-#回帰分析用
-reg_df = df.copy()
-
-binary_cols = ["python", "sql", "aws", "remote", "no_experience"]
-
-for col in binary_cols:
-    reg_df[col] = reg_df[col].astype(int)
-
-#重回帰分析
-model = smf.ols("salary ~ python + sql + aws + remote + no_experience + C(keyword)", data=reg_df).fit()
-
-print(model.summary())
+print("CSV保存完了")
