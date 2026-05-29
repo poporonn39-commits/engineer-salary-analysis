@@ -7,8 +7,8 @@ import os
 
 load_dotenv()
 
-APP_ID = "6567b9ca"
-APP_KEY = "12776a9c4c36d3b8d12e82eb89df5a23"
+APP_ID = "your_app_id"
+APP_KEY = "your_app_key"
 
 keywords = [
     "data analyst",
