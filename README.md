@@ -27,6 +27,18 @@ Adzuna APIから取得したUS求人データを用いて、
 - US job posting
 - 約1200件
 
+
+対象職種:
+・Data Analyst
+・Junior Data Analyst
+・Software Engineer
+・Frontend Engineer
+・Backend Engineer
+・Full Stack Engineer
+・Junior Developer
+・Graduate Engineer
+・Entry Level Analyst
+
 ## 4.使用技術
 
 - Python
